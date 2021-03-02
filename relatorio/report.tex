@@ -1,0 +1,242 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% University/School Laboratory Report
+% LaTeX Template
+% Version 3.1 (25/3/14)
+%
+% This template has been downloaded from:
+% http://www.LaTeXTemplates.com
+%
+% Original author:
+% Linux and Unix Users Group at Virginia Tech Wiki 
+% (https://vtluug.org/wiki/Example_LaTeX_chem_lab_report)
+%
+% License:
+% CC BY-NC-SA 3.0 (http://creativecommons.org/licenses/by-nc-sa/3.0/)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND DOCUMENT CONFIGURATIONS
+%----------------------------------------------------------------------------------------
+
+\documentclass{article}
+
+\usepackage[version=3]{mhchem} % Package for chemical equation typesetting
+\usepackage{siunitx} % Provides the \SI{}{} and \si{} command for typesetting SI units
+\usepackage{graphicx} % Required for the inclusion of images
+\usepackage{natbib} % Required to change bibliography style to APA
+\usepackage{amsmath} % Required for some math elements 
+\usepackage{listings}
+\usepackage{listings-rust}
+\usepackage{xcolor}
+\usepackage[portuguese]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{url}
+
+\setlength\parindent{0pt} % Removes all indentation from paragraphs
+
+\renewcommand{\labelenumi}{\alph{enumi}.} % Make numbering in the enumerate environment by letter rather than number (e.g. section 6)
+
+%\usepackage{times} % Uncomment to use the Times New Roman font
+
+%----------------------------------------------------------------------------------------
+%	DOCUMENT INFORMATION
+%----------------------------------------------------------------------------------------
+
+\title{Atividade Threads} % Title
+
+\author{ Samuel Cavalcanti } % Author name
+
+\date{\today} % Date for the report
+
+\begin{document}
+
+\maketitle % Insert the title, author and date
+
+
+% If you wish to include an abstract, uncomment the lines below
+% \begin{abstract}
+% Abstract text
+% \end{abstract}
+
+%----------------------------------------------------------------------------------------
+%	SECTION 1
+%----------------------------------------------------------------------------------------
+
+
+
+\lstdefinestyle{customRust}{
+  belowcaptionskip=1\baselineskip,
+  breaklines=true,
+  frame=L,
+  xleftmargin=\parindent,
+  language=Rust,
+  showstringspaces=false,
+  basicstyle=\footnotesize\ttfamily,
+  keywordstyle=\bfseries\color{green!40!black},
+  commentstyle=\itshape\color{purple!40!black},
+  identifierstyle=\color{blue},
+  stringstyle=\color{orange},
+  backgroundcolor=\color[gray]{0.97},
+}
+\lstset{language=Rust,style=customRust}
+
+\section*{Testando o algoritmo de Fibonacci}
+
+Para resolver o problema proposto, foi inicialmente implementado um algoritmo que gera a sequência de Fibonacci dado o ultimo index desejado.
+e foi feito um teste simples que comprar a lista gerada pelo algoritmo com uma lista de valores esperados retirados do \cite{wikipedia}. Tanto o algoritmo
+e o seu teste pode ser visto no lib.rs. Durante os testes do algoritmo implementado foi descoberto que a partir do index 47, o algoritmo
+falha, uma vez que seu valor é muito maior que é possível armazenar em uma variável inteira de 32bits e foi adicionado um teste para exemplificar
+esse fato. Uma vez sabendo que o algoritmo funciona dada a sua limitação, foi decidido que essa parte do exercício foi resolvida.  
+\lstinputlisting[label={lib}, caption={lib.rs}, style=customRust]{../src/lib.rs}
+
+
+\newpage
+\section*{Criando uma Command line interface (CLI) }
+Em Rust, uma das bibliotecas mais utilizadas cara criar CLIs é o command line Argument Parser (clap), um App clap
+criado possui a seguintes propriedades: autor, sobre, argumentos, versão. No author foi colocado o meu nome e meu e-mail,
+sobre, foi escrito uma breve descrição da Atividade e para essa aplicação, só é necessário um único argumento, que 
+representa quantos números da sequencia de Fibonacci será exibida. Essa parte do código foi recortada e pode ser vista
+separadamente. \ref{clap}
+\begin{lstlisting}[language=Rust, label=clap, caption=CLAP , style=customRust]
+  let matches = clap_app!(tarefa_threads =>
+  (author: "Samuel Cavalcanti <scavalcanti111@gmail.com>")
+  (about: "Tarefa Threads, o usuario digitara na linha de comandos a quantidade de numeros de Fibonacci que o programa deve gerar")
+  (@arg Number: +required "Digite a quantidade de numeros de fibonacci")
+  (version: "1.0")
+).get_matches();
+  \end{lstlisting}
+
+  \newpage
+
+\section*{Programação paralela em Rust}
+
+  Assim como \textbf{C++}, rust possui smart pointers, esses ponteiros especiais desalocam a memória automáticamente, quando nenhum ponteiro está apontando para ela,
+  em rust esse ponteiros são chamados de \textbf{Arc} \cite{klabnik2019rust}. Como por padrão a linguagem Rust não permite o compartilhamento de variáveis entre diferentes threads,
+  se faz necessário o uso desse ponteiro \textbf{Arc}, a qual podemos utilizar o método \textbf{clone} e passar uma referência para a outra thread. Existem diferentes
+  formas seguras de compartilhar memória entre threads, uma delas é através de um \textbf{Mutex}, um Mutex, é uma abreviação de mutual exclusion, que basicamente, permite
+  que apenas uma thread tem acesso a uma variável por vez e para ter acesso a essa variável é preciso chamar uma função especial chamada \textbf{lock}, que faz basicamente,
+  retorna a variável e impede que qualquer outra thread tenha acesso a essa variável. Como dito anteriormente, Rust não permite que uma mesma variável esteja presente em
+  duas threads, por isso também se faz o uso o \textbf{move}, que \textit{move} as variáveis da função main, para a \textbf{função anônima} que é passada na função \textbf{thread::spawn},
+  que  \textit{spawna} uma thread. Funções anônimas são presentes em várias linguagens de programação como Kotlin, python e Javascript, basicamente são funções que não
+  possui nomes, em Rust outra diferença que ao invés de utilizar \textbf{()}, usa-se as barras: $||$, observe que utilizando o \textbf{move}, não foi necessário passar
+  valores, como parâmetro, mas implicitamente, estou passando um referência do \textbf{Mutex} e a variável \textbf{input}.
+
+  \begin{lstlisting}[language=Rust, label={mutex}, caption=Programação paralela , style=customRust]
+    let mutex = Arc::new(Mutex::new(LinkedList::new()));
+  
+    let mutex_thread_child = Arc::clone(&mutex);
+    let handle = thread::spawn(move || {
+        let mut mutex_fibonacci_numbers = mutex_thread_child.lock().unwrap();
+        *mutex_fibonacci_numbers = fibonacci(input);
+    });
+    handle.join().unwrap();
+  \end{lstlisting}
+
+
+  
+\newpage
+
+\section*{Tratamento de Erro em Rust}
+Em Rust existe dois tipos de Erros, irrecuperáveis e os recuperáveis. Erros recuperáveis
+são por exemplo, arquivos não encontrados, http requests,  \textbf{parse} de strings.
+Já erros irrecuperáveis, são os erros sinônimos de bugs como, acesso indevido de endereço de memória,
+estouro da pilha e outros, quando acontece esses erros não é possível trata-los em tempo de execução.
+Nó código apresentado, existem diferentes situações onde pode ocorrer falhas, a primeira delas é no
+\textbf{parse} da string que supostamente deveria ser um número positívo. Em Rust, quando algo é passível
+de erro, é retornado ou uma variável do tipo \textbf{Result} ou do tipo \textbf{Option}. No caso do \textbf{Result}
+ele pode ser de dois tipos de estruturas, \textbf{Ok} ou \textbf{Error}. No caso do \textbf{parse} , o \textbf{Result} do tipo \textbf{Ok} 
+\textit{retorna} o valor de uma variável inteira de 32bits sem sinal, se for do tipo \textbf{Error}, ele retorna o erro do parse. Já o
+\textbf{Option} pode ser de dois tipos: \textbf{Some} ou \textbf{None}, onde \textbf{Some} pode ser qualquer tipo de objeto \textbf{enum}
+e \textbf{None} seria quando não retorna nada. Verificar erros em Rust pode ser algo bem cansativo e as vezes desnecessário, por isso
+tanto \textbf{Result} quando \textbf{Option}, possui métodos como \textbf{unwrap} ou \textbf{expect}, o \textbf{unwrap} retorna o valor
+dentro do tipo \textbf{Ok} ou \textbf{Some}, mas caso não seja desses tipos, a aplicação se encerra com uma mensagem de erro e caso
+queria editar essa mensagem, pode utilizar o \textbf{expect}.
+
+\begin{lstlisting}[language=Rust, caption={Momentos que foi utilizando unwrap e expect}, style=customRust]
+
+  let input = matches
+        .value_of("Number")
+        \\ compilador nao sabe se he possivel
+        \\ achar o argumento Number
+        .unwrap() 
+        .parse::<usize>()
+        \\ encerra o programa caso nao seja possivel
+        \\ fazer o parse do argumento da funcao.
+        .expect("\nError nao foi possivel fazer o parse do input. Um numero positivo era o esperado.\n");
+
+
+  \* o compilador nao sabe dizer se he possivel fazer o lock da lista ligada */ 
+  let mut mutex_fibonacci_numbers = mutex_thread_child.lock().unwrap();
+
+  \\ o compilador nao sabe dizer se he possivel esperar a thread.
+  handle.join().unwrap();
+
+\end{lstlisting}
+
+Apesar, de que em quase todo o código é possível não tratar o erro, dado que se
+o argumento não for transformando para o tipo \textbf{usize}, não há nada o que fazer ou quando sabemos
+de antemão que não irá haver dead-locks, ou erros que impeçam o \textbf{join}.
+Houve uma vez que foi preciso tratar o erro, o erro do overflow \ref{match}.
+
+\begin{lstlisting}[language=Rust, label={match} ,caption={Momento que foi necessário tratar o Option}, style=customRust]
+
+let option = n_1_element.checked_add(n_element);
+
+match option {
+    Some(next_fibonacci_number) => {
+        fibonacci_numbers.push_back(next_fibonacci_number);
+        n_element = n_1_element;
+        n_1_element = next_fibonacci_number;
+    }
+    None => {
+        eprintln!(
+            "Nao foi possivel adicionar, variavel inteira de 32 bits atingiu seu limite!!"
+        );
+        return fibonacci_numbers;
+    }
+}
+\end{lstlisting}
+
+Neste caso, após observar que a aplicação se encerrava ao pedir a sequencia de Fibonacci até 50 elemento,
+sentiu-se a necessidade de \textit{checar} cada vez  que se somava o número inteiro $I_{n + 1}$ com o $I_{n}$.
+para isso foi utilizando o método \textbf{checked\_add}, que ao invés de apenas somar o valor, ele verifica se
+o novo valor é possível de ser representado como inteiro de 32bits, caso não seja possível é retornado a lista
+até onde foi possível gerar e uma mensagem de error, dizendo que houve um overflow.
+
+
+\section*{Exibindo valores da Sequência de Fibonacci}
+Após a execução da thread, é recuperado a lista ligada por meio do \textbf{mutex}, foi feito um laço \textbf{for} pela lista
+ligada e exibido na tela o número de Fibonacci e seu respectivo valor. Por meio do \textbf{Macro println!}, em Rust \textbf{Macros}
+são funções que executadas em tempo de compilação, desde modo o parsing da formatação da mensagem e geração de tipos ocorre em tempo de compilação.
+Na prática a sua usabilidade se assemelha as função \textbf{println} do Dart, kotlin, Java.  
+
+\begin{lstlisting}[language=Rust, label={println} ,caption={Exibindo valores da Sequência de Fibonacci}, style=customRust]
+
+  let mutex_fibonacci_numbers = mutex.lock().unwrap();
+
+  println!("Sequencia: ");
+  
+  for (index, number) in mutex_fibonacci_numbers.iter().enumerate() {
+      println!("F({}) - {}", index, number);
+  }
+\end{lstlisting}
+
+
+
+
+\newpage
+\lstinputlisting[label={main}, caption={main.rs}, style=customRust]{../src/main.rs}
+
+%----------------------------------------------------------------------------------------
+%	BIBLIOGRAPHY
+%----------------------------------------------------------------------------------------
+
+\bibliographystyle{apalike}
+% %
+\bibliography{sample}
+
+%----------------------------------------------------------------------------------------
+
+
+\end{document}
